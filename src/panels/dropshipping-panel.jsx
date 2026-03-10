@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 
 const mockProducts = [
   { id: 1, name: "Deri Cüzdan", supplier: "Tedarikçi A", cost: 85, price: 249, stock: 42, status: "aktif", orders: 18 },
@@ -59,14 +60,36 @@ const StatCard = ({ icon, label, value, sub, color }) => (
 
 export default function DropshippingPanel() {
   const [tab, setTab] = useState("dashboard");
-  const [products, setProducts] = useState(mockProducts);
-  const [suppliers] = useState(mockSuppliers);
-  const [orders] = useState(mockOrders);
+  const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: "", supplier: "", cost: "", price: "", stock: "" });
   const [newSupplier, setNewSupplier] = useState({ name: "", contact: "", phone: "" });
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const { data: pData } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+      const { data: oData } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+      const { data: sData } = await supabase.from('suppliers').select('*').order('created_at', { ascending: false });
+      
+      if (pData) setProducts(pData);
+      if (oData) setOrders(oData);
+      if (sData) setSuppliers(sData);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
   const totalProfit = products.reduce((s, p) => s + (p.price - p.cost) * p.orders, 0);
@@ -78,20 +101,25 @@ export default function DropshippingPanel() {
     p.supplier.toLowerCase().includes(search.toLowerCase())
   );
 
-  const addProduct = () => {
+  const addProduct = async () => {
     if (!newProduct.name) return;
-    setProducts([...products, {
-      id: products.length + 1,
+    const stockNum = +newProduct.stock || 0;
+    const item = {
       name: newProduct.name,
       supplier: newProduct.supplier || "—",
       cost: +newProduct.cost || 0,
       price: +newProduct.price || 0,
-      stock: +newProduct.stock || 0,
-      status: +newProduct.stock > 5 ? "aktif" : +newProduct.stock > 0 ? "az stok" : "tükendi",
+      stock: stockNum,
+      status: stockNum > 5 ? "aktif" : stockNum > 0 ? "az stok" : "tükendi",
       orders: 0
-    }]);
-    setNewProduct({ name: "", supplier: "", cost: "", price: "", stock: "" });
-    setShowAddProduct(false);
+    };
+
+    const { error } = await supabase.from('products').insert([item]);
+    if (!error) {
+      fetchData();
+      setNewProduct({ name: "", supplier: "", cost: "", price: "", stock: "" });
+      setShowAddProduct(false);
+    }
   };
 
   const tabs = [
@@ -123,6 +151,15 @@ export default function DropshippingPanel() {
     fontSize: 14, fontWeight: 600, marginRight: 8,
     transition: "var(--transition)"
   };
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-secondary)' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ border: '4px solid rgba(0,0,0,0.1)', borderTop: '4px solid #e8ff47', borderRadius: '50%', width: 40, height: 40, animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+        <p style={{ fontFamily: "'Syne', sans-serif", fontSize: 18 }}>Veriler Yükleniyor...</p>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{

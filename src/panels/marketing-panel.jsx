@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 
 // ── Mock Data ──────────────────────────────────────────────────────────────
 const mockCampaigns = [
@@ -55,12 +56,32 @@ const btnGhost = { background: "transparent", color: "var(--text-secondary)", bo
 
 export default function MarketingPanel() {
   const [tab, setTab] = useState("overview");
-  const [campaigns, setCampaigns] = useState(mockCampaigns);
-  const [emails, setEmails] = useState(mockEmails);
+  const [campaigns, setCampaigns] = useState([]);
+  const [emails, setEmails] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showNewCampaign, setShowNewCampaign] = useState(false);
   const [showNewEmail, setShowNewEmail] = useState(false);
   const [newCampaign, setNewCampaign] = useState({ name: "", platform: "Meta", type: "Satış", budget: "", start: "", end: "" });
   const [newEmail, setNewEmail] = useState({ subject: "", type: "E-posta", date: "" });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const { data: cData } = await supabase.from('campaigns').select('*').order('created_at', { ascending: false });
+      const { data: eData } = await supabase.from('outreach').select('*').order('created_at', { ascending: false });
+      
+      if (cData) setCampaigns(cData);
+      if (eData) setEmails(eData);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const totalSpent   = campaigns.reduce((s, c) => s + c.spent, 0);
   const totalRevenue = campaigns.reduce((s, c) => s + c.revenue, 0);
@@ -76,19 +97,54 @@ export default function MarketingPanel() {
     { key: "roi",        label: "💹 ROI Analizi" },
   ];
 
-  const addCampaign = () => {
+  const addCampaign = async () => {
     if (!newCampaign.name || !newCampaign.budget) return;
-    setCampaigns([...campaigns, { id: campaigns.length + 1, ...newCampaign, budget: +newCampaign.budget, spent: 0, clicks: 0, impressions: 0, conversions: 0, revenue: 0, status: "taslak" }]);
-    setNewCampaign({ name: "", platform: "Meta", type: "Satış", budget: "", start: "", end: "" });
-    setShowNewCampaign(false);
+    const item = {
+      ...newCampaign,
+      budget: +newCampaign.budget,
+      spent: 0,
+      clicks: 0,
+      impressions: 0,
+      conversions: 0,
+      revenue: 0,
+      status: "taslak"
+    };
+
+    const { error } = await supabase.from('campaigns').insert([item]);
+    if (!error) {
+      fetchData();
+      setNewCampaign({ name: "", platform: "Meta", type: "Satış", budget: "", start: "", end: "" });
+      setShowNewCampaign(false);
+    }
   };
 
-  const addEmail = () => {
+  const addEmail = async () => {
     if (!newEmail.subject) return;
-    setEmails([...emails, { id: emails.length + 1, ...newEmail, sent: 0, opened: 0, clicked: 0, revenue: 0, status: "taslak" }]);
-    setNewEmail({ subject: "", type: "E-posta", date: "" });
-    setShowNewEmail(false);
+    const item = {
+      ...newEmail,
+      sent: 0,
+      opened: 0,
+      clicked: 0,
+      revenue: 0,
+      status: "taslak"
+    };
+
+    const { error } = await supabase.from('outreach').insert([item]);
+    if (!error) {
+      fetchData();
+      setNewEmail({ subject: "", type: "E-posta", date: "" });
+      setShowNewEmail(false);
+    }
   };
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-secondary)' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ border: '4px solid rgba(0,0,0,0.1)', borderTop: '4px solid #e8ff47', borderRadius: '50%', width: 40, height: 40, animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+        <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: 1 }}>Veriler Yükleniyor...</p>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{
