@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import './index.css';
 import DropshippingPanel from './panels/dropshipping-panel';
 import MarketingPanel from './panels/marketing-panel';
+import LogPanel from './panels/LogPanel';
+import { LogProvider } from './context/LogContext';
 
 const SidebarItem = ({ active, label, icon, sub, onClick, accent }) => (
   <button
@@ -62,6 +64,13 @@ function App() {
       icon: '📣',
       sub: 'REKLAM & ANALİZ',
       accent: '#e8ff47'
+    },
+    logs: {
+      component: <LogPanel />,
+      label: 'System Logs',
+      icon: '📋',
+      sub: 'İŞLEM GEÇMİŞİ',
+      accent: '#60a5fa'
     }
   };
 
@@ -124,6 +133,14 @@ function App() {
             accent="#e8ff47"
             onClick={() => setActiveTab('marketing')}
           />
+          <SidebarItem 
+            active={activeTab === 'logs'}
+            label="Loglar"
+            icon="📋"
+            sub="Sistem Geçmişi"
+            accent="#60a5fa"
+            onClick={() => setActiveTab('logs')}
+          />
         </nav>
 
         <div style={{ 
@@ -158,4 +175,10 @@ function App() {
   );
 }
 
-export default App;
+export default function AppWrapper() {
+  return (
+    <LogProvider>
+      <App />
+    </LogProvider>
+  );
+}
