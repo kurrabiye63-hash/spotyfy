@@ -1,0 +1,6 @@
+ error 
+ 
+ The directory D:/avy/spotyfy/shopify-app doesn't have a package.json. 
+ 
+ 
+

@@ -1,0 +1,71 @@
+2026-03-11T17:49:25.472Z: Running command auth login
+2026-03-11T17:49:25.482Z: Running system process:
+ Command: C:\Program Files\nodejs\node.exe C:\Users\user\AppData\Local\npm-cache\_npx\5e8c127031d71bbc\node_modules\@shopify\cli\bin\run.js notifications list --ignore-errors
+ Working directory: D:/avy/spotyfy/shopify-app
+
+2026-03-11T17:49:25.494Z: Notifications to show: 0
+ error 
+ 
+ Nonexistent flags: --verbose, --no-color 
+ See more help with --help 
+ 
+ 
+
+2026-03-11T17:49:25.571Z: Running system process:
+ Command: npm prefix
+ Working directory: D:/avy/spotyfy/shopify-app
+
+2026-03-11T17:49:25.914Z: Obtaining the dependency manager in directory .....
+2026-03-11T17:49:26.271Z: Getting current session ID...
+2026-03-11T17:49:26.273Z: Getting current session ID...
+2026-03-11T17:49:26.873Z: Request to https://monorail-edge.shopifysvc.com/v1/produce completed in 595 ms
+With response headers:
+ - x-request-id: cf26ae63-e59e-4cbd-8dfa-a54fc0c9d326
+ 
+2026-03-11T17:49:26.875Z: Analytics event sent: {
+ "command": "auth login",
+ "time_start": 1773251365473,
+ "time_end": 1773251365536,
+ "total_time": 63,
+ "success": false,
+ "cli_version": "3.92.0",
+ "ruby_version": "",
+ "node_version": "22.14.0",
+ "is_employee": false,
+ "uname": "windows amd64",
+ "env_ci": false,
+ "env_plugin_installed_any_custom": false,
+ "env_plugin_installed_shopify": "[\"@shopify/cli\"]",
+ "env_shell": "cmd.exe",
+ "env_device_id": "d02609783eaceb865854a9e864a0fd1af9a6d349",
+ "env_cloud": "localhost",
+ "env_package_manager": "npm",
+ "env_is_global": true,
+ "env_auth_method": "device_auth",
+ "env_is_wsl": false,
+ "env_build_repository": "Shopify/cli",
+ "cmd_app_warning_api_key_deprecation_displayed": false,
+ "cmd_all_timing_network_ms": 0,
+ "cmd_all_timing_prompts_ms": 0,
+ "cmd_all_launcher": "npm",
+ "cmd_all_topic": "auth",
+ "cmd_all_plugin": "@shopify/cli",
+ "cmd_all_timing_active_ms": 63,
+ "cmd_all_exit": "expected_error",
+ "user_id": "c0a66f06-160c-47c6-b1a8-95a5e6ae06fa",
+ "request_ids": [],
+ "args": "--verbose --no-color",
+ "error_message": "Nonexistent flags: --verbose, --no-color\nSee more help with --help",
+ "env_plugin_installed_all": "[\"@shopify/cli\"]",
+ "env_shopify_variables": "{}",
+ "metadata": "{\"extraPublic\":{},\"extraSensitive\":{}}"
+}
+2026-03-11T17:49:26.884Z: Getting current session ID...
+2026-03-11T17:49:26.885Z: Reporting handled error to Bugsnag: Nonexistent flags: --verbose, --no-color
+See more help with --help
+2026-03-11T17:49:26.926Z: Running system process:
+ Command: npm prefix
+ Working directory: D:/avy/spotyfy/shopify-app
+
+2026-03-11T17:49:27.308Z: Obtaining the dependency manager in directory .....
+2026-03-11T17:49:27.308Z: Getting current session ID...

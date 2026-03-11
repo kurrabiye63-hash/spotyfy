@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { useLogs } from "../context/LogContext";
 import { StatusBadge, StatCard, LoadingSpinner, inputStyle, btnPrimary, btnSecondary, deleteBtn, editBtn } from "../components/ui";
+import { fetchShopifyProducts, fetchShopifyOrders } from "../lib/shopify";
+import { fetchTrendingProducts, getTrendCategories } from "../lib/trending";
 
 export default function DropshippingPanel() {
   const { addLog } = useLogs();
@@ -16,8 +18,54 @@ export default function DropshippingPanel() {
   const [newProduct, setNewProduct] = useState({ name: "", supplier: "", cost: "", price: "", stock: "" });
   const [newSupplier, setNewSupplier] = useState({ name: "", contact: "", phone: "" });
   const [search, setSearch] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [trendCategory, setTrendCategory] = useState("all");
+  const [trendingProducts, setTrendingProducts] = useState([]);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendProgress, setTrendProgress] = useState({ done: 0, total: 0 });
+  const [lastTrendUpdate, setLastTrendUpdate] = useState(null);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+  const syncIntervalRef = useRef(null);
 
-  useEffect(() => { fetchData(); }, []);
+  const trendCategories = getTrendCategories();
+  const filteredTrends = trendCategory === "all" ? trendingProducts : trendingProducts.filter(p => p.category === trendCategory);
+
+  // İlk yükleme
+  useEffect(() => { fetchData(); loadTrending(); }, []);
+
+  // Otomatik senkronizasyon (her 5 dakikada bir)
+  useEffect(() => {
+    if (autoSyncEnabled) {
+      syncIntervalRef.current = setInterval(() => {
+        loadTrending();
+        addLog("Popüler ürünler otomatik güncellendi", "info");
+      }, 5 * 60 * 1000); // 5 dakika
+    }
+    return () => {
+      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+    };
+  }, [autoSyncEnabled]);
+
+  const loadTrending = async () => {
+    try {
+      setTrendLoading(true);
+      setTrendProgress({ done: 0, total: 8 });
+      const products = await fetchTrendingProducts((done, total) => {
+        setTrendProgress({ done, total });
+      });
+      if (products.length > 0) {
+        setTrendingProducts(products);
+        setLastTrendUpdate(new Date());
+        addLog(`${products.length} popüler ürün yüklendi (gerçek mağazalardan)`, "success");
+      } else {
+        addLog("Mağazalardan ürün çekilemedi, lütfen tekrar deneyin", "warning");
+      }
+    } catch (error) {
+      addLog(`Trend yükleme hatası: ${error.message}`, "error");
+    } finally {
+      setTrendLoading(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -28,19 +76,62 @@ export default function DropshippingPanel() {
       if (pData) setProducts(pData);
       if (oData) setOrders(oData);
       if (sData) setSuppliers(sData);
-      addLog("Dropshipping verileri başarıyla senkronize edildi", "success");
+      addLog("Veriler başarıyla yüklendi", "success");
     } catch (error) {
       console.error("Error fetching data:", error);
       addLog(`Veri çekme hatası: ${error.message}`, "error");
     } finally { setLoading(false); }
   };
 
-  const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
-  const totalProfit = products.reduce((s, p) => s + (p.price - p.cost) * p.orders, 0);
+  const syncWithShopify = async () => {
+    try {
+      setSyncing(true);
+      addLog("Shopify ile senkronizasyon başlatıldı...", "info");
+      
+      const [sProducts, sOrders] = await Promise.all([
+        fetchShopifyProducts(),
+        fetchShopifyOrders()
+      ]);
+
+      // Handle products mapping from Shopify
+      const mappedProducts = sProducts.map(p => ({
+        id: p.id,
+        name: p.title,
+        supplier: p.vendor,
+        cost: 0, // Shopify Admin API usually doesn't provide cost unless configured
+        price: p.variants?.[0]?.price || 0,
+        stock: p.variants?.[0]?.inventory_quantity || 0,
+        status: p.status === 'active' ? 'aktif' : 'taslak',
+        orders: 0 // This would need additional logic to sync with order data
+      }));
+
+      // Handle orders mapping from Shopify
+      const mappedOrders = sOrders.map(o => ({
+        id: o.name,
+        customer: o.customer ? `${o.customer.first_name} ${o.customer.last_name}` : "Bilinmiyor",
+        product: o.line_items?.[0]?.title || "Karma Sipariş",
+        date: new Date(o.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' }),
+        total: o.total_price,
+        status: o.fulfillment_status === 'fulfilled' ? 'teslim edildi' : 'hazırlanıyor'
+      }));
+
+      setProducts(mappedProducts);
+      setOrders(mappedOrders);
+      
+      addLog(`${mappedProducts.length} ürün ve ${mappedOrders.length} sipariş Shopify'dan çekildi`, "success");
+    } catch (error) {
+      addLog(`Shopify senkronizasyon hatası: ${error.message}`, "error");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const totalRevenue = orders.reduce((s, o) => s + Number(o.total), 0);
+  const totalProfit = products.reduce((s, p) => s + (Number(p.price) - Number(p.cost)) * (p.orders || 0), 0);
   const activeProducts = products.filter(p => p.status === "aktif").length;
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.supplier.toLowerCase().includes(search.toLowerCase())
+    (p.supplier && p.supplier.toLowerCase().includes(search.toLowerCase()))
   );
 
   const deleteProduct = async (id) => {
@@ -91,9 +182,20 @@ export default function DropshippingPanel() {
     } else addLog(`Ürün ekleme hatası: ${error.message}`, "error");
   };
 
+  const addTrendToProducts = async (trend) => {
+    const stockNum = 50;
+    const item = { name: trend.name, supplier: trend.supplier, cost: trend.cost, price: trend.price, stock: stockNum, status: "aktif", orders: 0 };
+    const { error } = await supabase.from('products').insert([item]);
+    if (!error) {
+      addLog(`Trend ürün eklendi: ${item.name}`, "success");
+      fetchData();
+    } else addLog(`Ürün ekleme hatası: ${error.message}`, "error");
+  };
+
   const tabs = [
     { key: "dashboard", label: "📊 Dashboard" },
     { key: "products", label: "📦 Ürünler" },
+    { key: "trending", label: "🔥 Popüler Ürünler" },
     { key: "orders", label: "🛒 Siparişler" },
     { key: "suppliers", label: "🏭 Tedarikçiler" },
     { key: "pricing", label: "💰 Fiyatlandırma" },
@@ -179,7 +281,16 @@ export default function DropshippingPanel() {
                 <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, marginBottom: 4, color: "var(--text-primary)" }}>Ürünler</h2>
                 <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>{products.length} ürün listelendi</p>
               </div>
-              <button style={btnPrimary} onClick={() => setShowAddProduct(true)}>+ Yeni Ürün</button>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button 
+                  style={{ ...btnSecondary, background: "#95bf47", color: "white", border: "none" }} 
+                  onClick={syncWithShopify}
+                  disabled={syncing}
+                >
+                  {syncing ? "🔄 Senkronize Ediliyor..." : "🛒 Shopify'dan Çek"}
+                </button>
+                <button style={btnPrimary} onClick={() => setShowAddProduct(true)}>+ Yeni Ürün</button>
+              </div>
             </div>
             <input placeholder="🔍 Ürün veya tedarikçi ara..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, maxWidth: 320, marginBottom: 16 }} />
             <div style={{ background: "var(--bg-secondary)", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", transition: "var(--transition)" }}>
@@ -258,6 +369,136 @@ export default function DropshippingPanel() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {tab === "trending" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, marginBottom: 4, color: "var(--text-primary)" }}>🔥 Popüler Ürünler</h2>
+                <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
+                  Diğer Shopify mağazalarından gerçek ürünler ·
+                  {lastTrendUpdate && <span style={{ color: "#22c55e", fontWeight: 600 }}> Son: {lastTrendUpdate.toLocaleTimeString('tr-TR')}</span>}
+                  {autoSyncEnabled && <span style={{ color: "#3b82f6", marginLeft: 8, fontSize: 12 }}>⏱ Her 5 dk güncellenir</span>}
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-secondary)", cursor: "pointer" }}>
+                  <input type="checkbox" checked={autoSyncEnabled} onChange={e => setAutoSyncEnabled(e.target.checked)} style={{ accentColor: "#22c55e" }} />
+                  Otomatik
+                </label>
+                <button onClick={loadTrending} disabled={trendLoading} style={{ ...btnSecondary, background: "#95bf47", color: "white", border: "none" }}>
+                  {trendLoading ? `🔄 ${trendProgress.done}/${trendProgress.total} mağaza...` : "🔄 Şimdi Yenile"}
+                </button>
+              </div>
+            </div>
+
+            {/* Yüklenme Barı */}
+            {trendLoading && (
+              <div style={{ marginBottom: 16, background: "var(--bg-secondary)", borderRadius: 8, overflow: "hidden", height: 6 }}>
+                <div style={{ height: "100%", width: `${(trendProgress.done / (trendProgress.total || 1)) * 100}%`, background: "linear-gradient(90deg, #22c55e, #3b82f6)", borderRadius: 8, transition: "width 0.3s" }} />
+              </div>
+            )}
+
+            {/* Kategori Filtreleri */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+              {trendCategories.map(c => (
+                <button key={c.key} onClick={() => setTrendCategory(c.key)} style={{
+                  padding: "8px 18px", borderRadius: 24, border: "none", cursor: "pointer",
+                  fontSize: 13, fontWeight: 600, transition: "all 0.2s",
+                  background: trendCategory === c.key ? "var(--text-primary)" : "var(--bg-secondary)",
+                  color: trendCategory === c.key ? "var(--bg-primary)" : "var(--text-secondary)",
+                  boxShadow: trendCategory === c.key ? "0 4px 12px rgba(0,0,0,0.15)" : "0 1px 3px rgba(0,0,0,0.06)",
+                }}>
+                  {c.icon} {c.label}
+                </button>
+              ))}
+            </div>
+
+            {/* İstatistik Barı */}
+            <div style={{ display: "flex", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
+              <StatCard icon="🔥" label="Trend Ürün" value={filteredTrends.length} sub="Anlık" color="#ef4444" />
+              <StatCard icon="💰" label="Ort. Kâr Marjı" value={`%${(filteredTrends.reduce((s, p) => s + ((p.price - p.cost) / p.price * 100), 0) / (filteredTrends.length || 1)).toFixed(0)}`} sub="Ortalama" color="#22c55e" />
+              <StatCard icon="📦" label="Toplam Satış" value={filteredTrends.reduce((s, p) => s + p.orders, 0).toLocaleString()} sub="Global" color="#3b82f6" />
+              <StatCard icon="⭐" label="En Yüksek Trend" value={filteredTrends.length > 0 ? Math.max(...filteredTrends.map(p => p.trend)) : 0} sub="Skor" color="#f59e0b" />
+            </div>
+
+            {/* Ürün Kartları */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+              {[...filteredTrends].sort((a, b) => b.trend - a.trend).map(p => {
+                const margin = (((p.price - p.cost) / p.price) * 100).toFixed(0);
+                return (
+                  <div key={p.id} style={{
+                    background: "var(--bg-secondary)", borderRadius: 16, padding: 20,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.06)", transition: "all 0.25s",
+                    border: "1.5px solid var(--border-color)", position: "relative", overflow: "hidden"
+                  }}>
+                    {/* Trend Skoru Barı */}
+                    <div style={{ position: "absolute", top: 0, left: 0, width: `${p.trend}%`, height: 3, background: `linear-gradient(90deg, #22c55e, ${p.trend > 90 ? '#ef4444' : '#f59e0b'})`, borderRadius: "16px 0 0 0" }} />
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                      <div style={{ fontSize: 36 }}>{p.image}</div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                        <span style={{ background: p.trend >= 90 ? "#fef2f2" : p.trend >= 80 ? "#fefce8" : "#f0fdf4", color: p.trend >= 90 ? "#dc2626" : p.trend >= 80 ? "#ca8a04" : "#16a34a", padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
+                          🔥 {p.trend}/100
+                        </span>
+                        <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>{p.store}</span>
+                      </div>
+                    </div>
+
+                    <h4 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 4, color: "var(--text-primary)" }}>{p.name}</h4>
+                    <p style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 12 }}>{p.supplier} · {p.category}</p>
+
+                    {/* Etiketler */}
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 14 }}>
+                      {p.tags.map(tag => (
+                        <span key={tag} style={{
+                          padding: "2px 8px", borderRadius: 8, fontSize: 10, fontWeight: 600,
+                          background: tag === "Çok Satan" ? "#dbeafe" : tag === "Trend" ? "#fce7f3" : tag === "Yüksek Marj" ? "#d1fae5" : tag === "Düşük Maliyet" ? "#fef3c7" : "#f3e8ff",
+                          color: tag === "Çok Satan" ? "#1d4ed8" : tag === "Trend" ? "#be185d" : tag === "Yüksek Marj" ? "#065f46" : tag === "Düşük Maliyet" ? "#92400e" : "#6b21a8",
+                        }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Fiyat Bilgileri */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, padding: "10px 12px", background: "var(--bg-primary)", borderRadius: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>Maliyet</div>
+                        <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: 14 }}>₺{p.cost}</div>
+                      </div>
+                      <div style={{ color: "var(--text-secondary)", fontSize: 18 }}>→</div>
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>Satış</div>
+                        <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: 14 }}>₺{p.price}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>Kâr</div>
+                        <div style={{ fontWeight: 700, color: "#22c55e", fontSize: 14 }}>₺{p.price - p.cost}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>Marj</div>
+                        <div style={{ fontWeight: 700, color: +margin > 60 ? "#22c55e" : "#f59e0b", fontSize: 14 }}>%{margin}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "var(--text-secondary)", marginBottom: 14 }}>
+                      <span>📦 {p.orders.toLocaleString()} global satış</span>
+                    </div>
+
+                    <button onClick={() => addTrendToProducts(p)} style={{
+                      width: "100%", padding: "10px 0", borderRadius: 10, border: "none",
+                      background: "linear-gradient(135deg, #22c55e, #16a34a)", color: "white",
+                      fontWeight: 700, fontSize: 13, cursor: "pointer", transition: "all 0.2s",
+                    }}>
+                      + Mağazama Ekle
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

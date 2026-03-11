@@ -1,0 +1,59 @@
+﻿node.exe : Ôò¡ÔöÇ error ÔöÇÔöÇÔöÇÔö
+ÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔ
+öÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔö
+ÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔ
+öÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔò«
+At C:\Program Files\nodejs\npx.ps1:
+29 char:3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotS 
+   pecified: (Ôò¡ÔöÇ error Ôö...Ô  
+  öÇÔöÇÔöÇÔöÇÔò«:String) [], Rem   
+ oteException
+    + FullyQualifiedErrorId : Nati 
+   veCommandError
+ 
+Ôöé                                
+                                   
+           Ôöé
+Ôöé  Failed to prompt:             
+                                   
+           Ôöé
+Ôöé                                
+                                   
+           Ôöé
+Ôöé  Which account would you like t
+o use?                             
+           Ôöé
+Ôöé                                
+                                   
+           Ôöé
+Ôöé  This usually happens when runn
+ing a command non-interactively, fo
+r example  Ôöé
+Ôöé   in a CI environment, or when 
+piping to or from another process. 
+           Ôöé
+Ôöé                                
+                                   
+           Ôöé
+Ôöé  To resolve this, specify the o
+ption in the command, or run the co
+mmand in   Ôöé
+Ôöé  an interactive environment suc
+h as your local terminal.          
+           Ôöé
+Ôöé                                
+                                   
+           Ôöé
+Ôò░ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔö
+ÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔ
+öÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔö
+ÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔ
+öÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔò»
+

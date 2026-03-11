@@ -1,0 +1,10 @@
+ error 
+ 
+ 
+ Validation errors in shopify.app.toml: 
+ 
+ [embedded]: Boolean is required 
+ 
+ 
+ 
+

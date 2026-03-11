@@ -1,0 +1,13 @@
+client_id = "02f9b5816213721c64f6a71e497b9c5c"
+name = "alperen"
+application_url = "https://example.com"
+embedded = true
+
+[access_scopes]
+scopes = "read_products,read_orders"
+
+[auth]
+redirect_urls = ["https://example.com"]
+
+[webhooks]
+api_version = "2024-01"
